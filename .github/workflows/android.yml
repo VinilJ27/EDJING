@@ -11,12 +11,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Build DJ Android App
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: Setup JDK
         uses: actions/setup-java@v4
@@ -24,25 +30,34 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Install command-line tools and platform-tools
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: |
-            platform-tools
-            platforms;android-36-ext1
-            cmake;3.22.1
+          packages: 'platform-tools'
+
+      # Install packages as separate arguments
+      - name: Install Android SDK Components
+        run: |
+          sdkmanager --install \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "cmake;3.22.1"
 
       - name: Verify SDK
         run: |
-          echo "SDK: $ANDROID_HOME"
-          test -d "$ANDROID_HOME/platforms/android-36-ext1"
-          test -d "$ANDROID_HOME/cmake/3.22.1"
+          which sdkmanager
+          sdkmanager --list_installed
 
-      - name: Verify Gradle
+      - name: Verify Project
         run: |
           test -f gradlew
           test -f gradle/wrapper/gradle-wrapper.jar
+          test -f app/build.gradle.kts
           chmod +x gradlew
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Generate Debug Keystore
         run: |
@@ -58,16 +73,13 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build APK
+      - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Unit Tests
+      - name: Run Unit Tests
         run: ./gradlew testDebugUnitTest
 
-      - name: Lint
+      - name: Run Lint
         run: ./gradlew lintDebug
 
       - name: Upload APK
