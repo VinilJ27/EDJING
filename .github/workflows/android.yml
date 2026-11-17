@@ -4,62 +4,50 @@ name: PulseMix Android CI
 on:
   push:
     branches: [main, master, develop]
-
   pull_request:
     branches: [main, master, develop]
-
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: android-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
-    name: Build PulseMix DJ App
     runs-on: ubuntu-latest
 
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK Components
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-36-ext1" \
-            "cmake;3.22.1"
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: |
+            platform-tools
+            platforms;android-36-ext1
+            cmake;3.22.1
 
-      - name: Verify Project Configuration
+      - name: Verify SDK
         run: |
-          echo "Checking Gradle Wrapper..."
+          echo "SDK: $ANDROID_HOME"
+          test -d "$ANDROID_HOME/platforms/android-36-ext1"
+          test -d "$ANDROID_HOME/cmake/3.22.1"
+
+      - name: Verify Gradle
+        run: |
           test -f gradlew
           test -f gradle/wrapper/gradle-wrapper.jar
           chmod +x gradlew
 
-          echo "Checking Android module..."
-          test -f app/build.gradle.kts
-          test -f app/src/main/cpp/CMakeLists.txt
-
       - name: Generate Debug Keystore
         run: |
           if [ ! -f debug.keystore ]; then
-            keytool -genkeypair \
-              -v \
+            keytool -genkeypair -v \
               -keystore debug.keystore \
               -storepass android \
               -alias androiddebugkey \
@@ -73,30 +61,19 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Debug APK
+      - name: Build APK
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Run Unit Tests
+      - name: Unit Tests
         run: ./gradlew testDebugUnitTest
 
-      - name: Run Android Lint
+      - name: Lint
         run: ./gradlew lintDebug
 
-      - name: Upload Debug APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: PulseMix-Debug-APK
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
-
-      - name: Upload Build Reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: PulseMix-Build-Reports
-          path: |
-            app/build/reports/
-            app/build/test-results/
-          if-no-files-found: ignore
-          retention-days: 7
