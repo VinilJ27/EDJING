@@ -1,0 +1,6 @@
+{
+  "name": "PulseMix",
+  "description": "Native Android dual-deck DJ mixing console with C++ Oboe DSP audio engine, real-time BPM beat-grid auto-sync, FX, sampler, and recording studio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
