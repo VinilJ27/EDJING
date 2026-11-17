@@ -1,65 +1,65 @@
-name: Android CI
+
+name: Android DJ App CI
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master, develop]
+
   pull_request:
-    branches:
-      - main
-      - master
+    branches: [main, master, develop]
+
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    name: Build Debug APK
+    name: Build DJ Android App
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Verify project root files
-        run: |
-          test -f settings.gradle.kts
-          test -f app/build.gradle.kts
-          test -f gradlew
-          test -f gradle/wrapper/gradle-wrapper.jar
-          test -f gradle/wrapper/gradle-wrapper.properties
-
-      - name: Set up JDK 21
+      - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
 
-      - name: Accept Android SDK licenses and install CMake
+      - name: Verify Gradle Wrapper
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager --install "platform-tools" "cmake;3.22.1"
+          ls -la
+          test -f gradlew
+          test -f gradle/wrapper/gradle-wrapper.jar
+          chmod +x gradlew
 
-      - name: Decode debug keystore
-        run: base64 -d debug.keystore.base64 > debug.keystore
-
-      - name: Grant execute permission for Gradle Wrapper
-        run: chmod +x gradlew
-
-      - name: Set up Gradle
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --stacktrace
 
-      - name: Upload Debug APK
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Run Android Lint
+        run: ./gradlew lintDebug
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: DJ-App-APK
+          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+          retention-days: 14
